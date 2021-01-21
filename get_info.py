@@ -2,9 +2,12 @@ import requests
 import time
 import csv
 import numpy as np
+from argparse import ArgumentParser
+from tqdm import tqdm
 
 
 def get_likes(list_users, type_content, owner_id, count, token, quiet):
+	print(f'Get likes on {type_content}s:')
 	base_url = 'https://api.vk.com/method/'
 	if type_content == 'post':
 		resp = requests.post(base_url + 'wall.get', data={
@@ -25,7 +28,7 @@ def get_likes(list_users, type_content, owner_id, count, token, quiet):
 	if not quiet:
 		print(f'{type_content}: {items}')
 
-	for item_id in items:
+	for item_id in tqdm(items):
 		resp_item = requests.post(base_url + 'likes.getList', data={
 					'type': type_content, 'owner_id': owner_id, 'item_id': item_id, 
 					'filter': 'likes', 'v': '5.80', 'access_token': token}).json()
@@ -44,11 +47,12 @@ def get_likes(list_users, type_content, owner_id, count, token, quiet):
 
 
 def get_gifts(list_users, owner_id, token, quiet):
+	print(f'Get gifts:')
 	base_url = 'https://api.vk.com/method/'
 	resp = requests.post(base_url + 'gifts.get', data={'user_id': owner_id, 'v': '5.80', 'access_token': token}).json()
 	if not quiet:
 		print(f'Gifts response: {resp}')
-	for gift in resp['response']['items']:
+	for gift in tqdm(resp['response']['items']):
 		user = gift['from_id']
 		message = gift['message']
 		if len(message) != 0 and user > 0:
@@ -66,8 +70,9 @@ def get_gifts(list_users, owner_id, token, quiet):
 
 
 def get_likes_by_user(list_users, type_content, user_id, count, token, quiet):
+	print(f'Get likes on {type_content}s by id{user_id}:')
 	base_url = 'https://api.vk.com/method/'
-	for owner_id in list_users:
+	for owner_id in tqdm(list_users):
 		if not quiet:
 			print(f'{type_content}s by {owner_id}')
 		if type_content == 'post':
@@ -106,8 +111,9 @@ def get_likes_by_user(list_users, type_content, user_id, count, token, quiet):
 
 
 def get_gifts_by_user(list_users, user_id, token, quiet):
+	print(f'Get gifts by id{user_id}:')
 	base_url = 'https://api.vk.com/method/'
-	for owner_id in list_users:
+	for owner_id in tqdm(list_users):
 		list_users[owner_id]['gifts_by_user'] = 0
 		resp = requests.post(base_url + 'gifts.get', data={
 			   'user_id': owner_id, 'v': '5.80', 'access_token': token}).json()
@@ -173,15 +179,30 @@ def to_csv(list_users, user_id):
 		for user, item in list_users.items():
 			item['id'] = user
 			writer.writerow(item)		
-		
+
+
+def parse_args():
+	parser = ArgumentParser()
+	parser.add_argument('--id',
+						default=48245655,
+						help='user id you want to get information')
+	parser.add_argument('--count', '-c',
+						default='5',
+						help='number of photos/posts to be examined')
+	parser.add_argument('--quiet', '-q',
+						help='do not display the text on command line',
+						action='store_true')
+	return parser.parse_args()		
+
+
 
 if __name__ == '__main__':
 	token = # insert your token here
-	base_url = 'https://api.vk.com/method/'
-	my_id = 48245655
-	
-	quiet = True
-	count = str(2) # сколько последних фото/постов просматривать
+
+	args = parse_args()
+	my_id = args.id
+	count = args.count
+	quiet = args.quiet
 	
 	related_users = {}
 	# get users and number of likes on posts of the user:
@@ -203,9 +224,6 @@ if __name__ == '__main__':
 							  owner_id=my_id, 
 							  token=token, 
 							  quiet=quiet)
-
-	#print(f'\nRelated users: num {len(related_users)} {related_users}\n')
-	
 
 	# get number of likes on posts of each user:
 	related_users = get_likes_by_user(list_users=related_users, 
@@ -230,7 +248,8 @@ if __name__ == '__main__':
 	related_users = get_users_info(list_users=related_users, 
 								   token=token, 
 								   quiet=quiet)
-	print(f'\nRelated: {related_users}\n')
+	if not quiet:
+		print(f'\nRelated: {related_users}\n')
 	
 	to_csv(related_users, my_id)
 	
